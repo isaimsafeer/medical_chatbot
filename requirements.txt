@@ -1,0 +1,9 @@
+langchain-huggingface
+langchain
+flask
+pypdf
+pinecone[grpc]
+langchain-pinecone
+langchain-community
+langchain-groq
+langchain-experimental
