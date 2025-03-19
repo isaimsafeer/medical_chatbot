@@ -1,14 +1,17 @@
-from langchain.document_loaders import PyPDFLoader, DirectoryLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
+import os
 
 # loading pdf file
-def load_pdf_file(data):
-    loader = DirectoryLoader(data,
-                             glob="*.pdf",
-                             loader_cls=PyPDFLoader)
-    
-    documents = loader.load()
+def load_pdf_file(directory):
+    documents = []
+    # Loop through all files in the directory
+    for filename in os.listdir(directory):
+        if filename.endswith(".pdf"):  # Check if the file is a PDF
+            file_path = os.path.join(directory, filename)
+            loader = PyPDFLoader(file_path)
+            documents.extend(loader.load())  # Add the loaded documents to the list
     return documents
 
 

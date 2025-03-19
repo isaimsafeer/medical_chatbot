@@ -5,39 +5,68 @@ from langchain_pinecone import PineconeVectorStore
 import os
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
-# loading the data
-extracted_data = load_pdf_file("data/")
+# Pinecone configuration
+INDEX_NAME = "medical-chatbot"
+DIMENSION = 768  # Matches your embedding model (e.g., Hugging Face default)
+METRIC = "cosine"
+CLOUD = "aws"
+REGION = "us-east-1"
 
-# Splitting into chunks
-text_chunks = text_splitter(extracted_data)
-print("length of text chunks:", len(text_chunks))
+def initialize_vectorstore():
+    """Initialize and return the Pinecone vector store."""
+    # Initialize Pinecone client
+    pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
-# Creating embeddings
-embeddings = hugging_face_embeddings()
+    # Check if index exists, create if not
+    existing_indexes = pc.list_indexes().names()
+    if INDEX_NAME not in existing_indexes:
+        print(f"Creating new index: {INDEX_NAME}")
+        pc.create_index(
+            name=INDEX_NAME,
+            dimension=DIMENSION,
+            metric=METRIC,
+            spec=ServerlessSpec(cloud=CLOUD, region=REGION)
+        )
+    else:
+        print(f"Index {INDEX_NAME} already exists.")
 
-# Creating Pinecone index
-index_name = "medical-chatbot"
+    # Connect to the index
+    index = pc.Index(INDEX_NAME)
+    embeddings = hugging_face_embeddings()
 
+    # Check if index has data
+    stats = index.describe_index_stats()
+    if stats["total_vector_count"] == 0:
+        print("Index is empty. Loading PDF, creating chunks, and uploading...")
+        extracted_data = load_pdf_file("data/")
+        if not extracted_data:
+            raise ValueError("No data extracted from PDF files.")
+        text_chunks = text_splitter(extracted_data)
+        print("Length of text chunks:", len(text_chunks))
+        vector_store = PineconeVectorStore.from_documents(
+            documents=text_chunks,
+            index_name=INDEX_NAME,
+            embedding=embeddings
+        )
+    else:
+        print("Index already contains data, just loading vector store...")
+        vector_store = PineconeVectorStore(index_name=INDEX_NAME, embedding=embeddings)
 
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-pc.create_index(
-    name=index_name,
-    dimension=768,
-    metric="cosine",
-    spec=ServerlessSpec(
-        cloud="aws",
-        region="us-east-1"
-    )
-)
+    return vector_store
 
+# Export the vector store (initialized once at module load)
+try:
+    vectorstore_from_docs = initialize_vectorstore()
+except Exception as e:
+    print(f"Error during initialization: {str(e)}")
+    vectorstore_from_docs = None
 
-index_name = "medical-chatbot"
-
-index = pc.Index(index_name)
-
-# Correctly initialize PineconeVectorStore
-vector_store = PineconeVectorStore(index_name=index_name, embedding=embeddings)
-
-vector_store.add_documents(documents=text_chunks)
+if __name__ == "__main__":
+    # For testing purposes
+    if vectorstore_from_docs:
+        print("Vector store initialized successfully.")
+    else:
+        print("Vector store initialization failed.")
