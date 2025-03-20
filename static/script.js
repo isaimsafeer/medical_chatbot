@@ -3,6 +3,7 @@ const chatForm = document.querySelector(".chat-form");
 const messageInput = document.querySelector(".message-input");
 const closeChatbot = document.getElementById("close-chatbot");
 
+
 let ws = null;
 
 // Initialize WebSocket connection
@@ -15,7 +16,13 @@ function initWebSocket() {
 
   ws.onmessage = (event) => {
     const message = event.data;
-    addMessage(message, "bot");
+    // Check if the message is a user echo or a bot response
+    if (message.startsWith("User:")) {
+      const userMessage = message.replace("User: ", "");
+      addMessage(userMessage, "user");
+    } else {
+      addMessage(message, "bot");
+    }
   };
 
   ws.onclose = () => {
@@ -35,16 +42,15 @@ function addMessage(message, sender) {
   messageDiv.classList.add("message");
   messageDiv.classList.add(sender === "bot" ? "bot-message" : "user-message");
 
-  if (sender === "bot") {
-    messageDiv.innerHTML = `
-      <img class="chatbot-logo" src="/static/images/robotic.png" alt="Chatbot Logo" width="50" height="50">
+  // Add image based on sender
+  const imageSrc = sender === "bot" ? "/static/images/robotic.png" : "/static/images/user.png";
+  
+  messageDiv.innerHTML = `
+    <div class="message-content">
+      <img class="chatbot-logo" src="${imageSrc}" alt="${sender} Logo" width="50" height="50">
       <div class="message-text">${message.replace(/\n/g, "<br>")}</div>
-    `;
-  } else {
-    messageDiv.innerHTML = `
-      <div class="message-text user-text">${message.replace(/\n/g, "<br>")}</div>
-    `;
-  }
+    </div>
+  `;
 
   chatBody.appendChild(messageDiv);
   chatBody.scrollTop = chatBody.scrollHeight;
@@ -56,7 +62,8 @@ chatForm.addEventListener("submit", (e) => {
   const message = messageInput.value.trim();
   if (!message) return;
 
-  addMessage(message, "user");
+  // Do NOT add the user message here; let the server handle it
+  // addMessage(message, "user"); // Removed to prevent duplication
 
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ message: message }));
